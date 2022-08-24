@@ -13,6 +13,8 @@ if(${WITH_CUDA})
   enable_language(CUDA)
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 # default
 set(LIB_VERSION_MAJOR 0)
 set(LIB_VERSION_MINOR 0)
