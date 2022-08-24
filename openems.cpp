@@ -46,6 +46,11 @@
 #include <boost/version.hpp> // only for BOOST_LIB_VERSION
 #include <vtkVersion.h>
 
+#ifdef WITH_CUDA
+#include "FDTD/engine_cuda.h"
+#include "FDTD/operator_cuda.h"
+#endif
+
 //external libs
 #include "tinyxml.h"
 #include "ContinuousStructure.h"
@@ -82,6 +87,7 @@ openEMS::openEMS()
 
 	m_engine = EngineType_Multithreaded; //default engine type
 	m_engine_numThreads = 0;
+	m_engine_cuda_device = 0;
 
 	m_Abort = false;
 	m_Exc = 0;
@@ -139,6 +145,10 @@ void openEMS::showUsage()
 	cout << "\t\t--engine=multithreaded\t\tengine using compressed operator + sse vector extensions + MPI + multithreading" << endl;
 #else
 	cout << "\t\t--engine=multithreaded\t\tengine using compressed operator + sse vector extensions + multithreading" << endl;
+#endif
+#ifdef WITH_CUDA
+	cout << "\t\t--engine=cuda\t\tengine using CUDA GPU" << endl;
+	cout << "\t\t--cuda-device=<n>\t\tuse CUDA device number (needs: --engine=cuda)" << endl;
 #endif
 	cout << "\t--numThreads=<n>\tForce use n threads for multithreaded engine (needs: --engine=multithreaded)" << endl;
 	cout << "\t--no-simulation\t\tonly run preprocessing; do not simulate" << endl;
@@ -216,6 +226,28 @@ bool openEMS::parseCommandLineArgument( const char *argv )
 		m_engine = EngineType_Multithreaded;
 		return true;
 	}
+	else if (strcmp(argv,"--engine=cuda")==0)
+	{
+#ifdef WITH_CUDA
+		cout << "openEMS - enabled CUDA" << endl;
+		m_engine = EngineType_CUDA;
+		return true;
+#else
+		cout << "openEMS - not compiled with CUDA support" << endl;
+		return false;
+#endif	
+	}
+	else if (strncmp(argv,"--cuda-device=",14)==0)
+	{
+#ifdef WITH_CUDA
+		this->SetCUDADevice(atoi(argv+14));
+		cout << "openEMS - using CUDA device number: " << m_engine_cuda_device << endl;
+		return true;
+#else
+		cout << "openEMS - not compiled with CUDA support" << endl;
+		return false;
+#endif	
+	}
 	else if (strncmp(argv,"--numThreads=",13)==0)
 	{
 		this->SetNumberOfThreads(atoi(argv+13));
@@ -224,8 +256,13 @@ bool openEMS::parseCommandLineArgument( const char *argv )
 	}
 	else if (strcmp(argv,"--engine=fastest")==0)
 	{
+#ifdef WITH_CUDA
+		cout << "openEMS - enabled CUDA engine" << endl;
+		m_engine = EngineType_CUDA;
+#else
 		cout << "openEMS - enabled multithreading engine" << endl;
 		m_engine = EngineType_Multithreaded;
+#endif
 		return true;
 	}
 	else if (strcmp(argv,"--no-simulation")==0)
@@ -621,6 +658,12 @@ bool openEMS::SetupOperator()
 	{
 		FDTD_Op = Operator_Multithread::New(m_engine_numThreads);
 	}
+#ifdef WITH_CUDA
+	else if (m_engine == EngineType_CUDA)
+	{
+		FDTD_Op = Operator_CUDA::New(m_engine_cuda_device);
+	}
+#endif
 	else
 	{
 		FDTD_Op = Operator::New();

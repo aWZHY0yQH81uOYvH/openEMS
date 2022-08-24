@@ -20,6 +20,10 @@
 
 #define FDTD_FLOAT float
 
+#ifdef WITH_CUDA
+#define CUDA_VECTOR float4 // Ensure this is the same as FDTD_FLOAT
+#endif
+
 #define __EPS0__ 8.85418781762e-12
 #define __MUE0__ 1.256637062e-6
 #define __C0__ 299792458

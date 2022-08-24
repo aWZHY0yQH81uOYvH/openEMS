@@ -31,6 +31,10 @@
 #include <math.h>
 #include "constants.h"
 
+#ifdef WITH_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #define F4VECTOR_SIZE 16 // sizeof(typeid(f4vector))
 
 #ifdef __GNUC__ // GCC
@@ -210,5 +214,72 @@ void Dump_N_3DArray2File(std::ostream &file, T**** array, const unsigned int* nu
 		}
 	}
 }
+
+#ifdef WITH_CUDA
+
+template <typename T>
+T*** Create3DArray_CUDA(const unsigned int* numLines)
+{
+	T*** array=NULL;
+	unsigned int pos[3];
+	cudaMallocManaged(&array, sizeof(T**)*numLines[0]);
+	for (pos[0]=0; pos[0]<numLines[0]; ++pos[0])
+	{
+		cudaMallocManaged(&array[pos[0]], sizeof(T*)*numLines[1]);
+		for (pos[1]=0; pos[1]<numLines[1]; ++pos[1])
+		{
+
+			cudaMallocManaged(&array[pos[0]][pos[1]], sizeof(T)*numLines[2]);
+			for (pos[2]=0; pos[2]<numLines[2]; ++pos[2])
+			{
+				array[pos[0]][pos[1]][pos[2]] = {0};
+			}
+		}
+	}
+	return array;
+}
+
+template <typename T>
+T**** Create_N_3DArray_CUDA(const unsigned int* numLines)
+{
+	T**** array=NULL;
+	cudaMallocManaged(&array, sizeof(T***)*3);
+	for (int n=0; n<3; ++n)
+	{
+		array[n]=Create3DArray<T>( numLines );
+	}
+	return array;
+}
+
+// Do not use with anything other than basic types! (does not call destructors)
+template <typename T>
+void Delete3DArray_CUDA(T*** array, const unsigned int* numLines)
+{
+	if (!array) return;
+	unsigned int pos[3];
+	for (pos[0]=0; pos[0]<numLines[0]; ++pos[0])
+	{
+		for (pos[1]=0; pos[1]<numLines[1]; ++pos[1])
+		{
+			cudaFree(array[pos[0]][pos[1]]);
+		}
+		cudaFree(array[pos[0]]);
+	}
+	cudaFree(array);
+}
+
+// Do not use with anything other than basic types! (does not call destructors)
+template <typename T>
+void Delete_N_3DArray_CUDA(T**** array, const unsigned int* numLines)
+{
+	if (!array) return;
+	for (int n=0; n<3; ++n)
+	{
+		Delete3DArray<T>(array[n],numLines);
+	}
+	cudaFree(array);
+}
+
+#endif // WITH_CUDA
 
 #endif // ARRAY_OPS_H
